@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.bat text eol=crlf
+keyloom_mania/_vendor/** -whitespace

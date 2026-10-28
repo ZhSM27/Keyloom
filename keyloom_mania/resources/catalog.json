@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "bundle_revision": 1,
+  "default_generator": "music-base",
+  "generators": [
+    {
+      "id": "music-base",
+      "revision": 1,
+      "label": "音乐押数 · 基线 r1",
+      "description": "真实计数监督的当前发布基线；自然度仍需试玩。",
+      "checkpoint": "generator/music-base-r1.pt",
+      "architecture": "music-count-v1"
+    },
+    {
+      "id": "count-lookahead",
+      "revision": 1,
+      "label": "计数前文 · 前瞻对照 r1",
+      "description": "相同基础权重，启用短叠计数前瞻。",
+      "checkpoint": "generator/count-lookahead-r1.pt",
+      "architecture": "count-context-v1"
+    },
+    {
+      "id": "count-teacher",
+      "revision": 1,
+      "label": "计数前文 · 真值前文 r1",
+      "description": "使用真实计数前文训练的研究对照。",
+      "checkpoint": "generator/count-teacher-r1.pt",
+      "architecture": "count-context-v1"
+    },
+    {
+      "id": "count-rollout",
+      "revision": 1,
+      "label": "计数前文 · 生成前文 r1",
+      "description": "使用生成计数前文训练的研究候选。",
+      "checkpoint": "generator/count-rollout-r1.pt",
+      "architecture": "count-context-v1"
+    }
+  ],
+  "roles": [
+    {
+      "id": "standard",
+      "label": "条件编排 · 标准 r1",
+      "revision": 1,
+      "checkpoint": "planner/role-standard-r1.pt",
+      "parameter_count": 1209630
+    },
+    {
+      "id": "balanced",
+      "label": "条件编排 · 主副均衡 r1",
+      "revision": 1,
+      "checkpoint": "planner/role-balanced-r1.pt",
+      "parameter_count": 1209630
+    }
+  ],
+  "density": [
+    {
+      "id": "contrast",
+      "label": "段落对比密度 r1",
+      "revision": 1,
+      "checkpoint": "planner/density-contrast-r1.pt",
+      "planner_sha256": "5c43c8b106be860a0fd5fb96bb4c0b1262778ffb19545d54010bcafc1c636326"
+    }
+  ],
+  "shared_resources": [
+    "planner/arrangement-r1.pt",
+    "planner/normalization.json",
+    "planner/thresholds.npz",
+    "planner/compiler.json",
+    "generator/normalization.json",
+    "generator/phrase-reference.json",
+    "generator/style-statistics.json"
+  ],
+  "files": {
+    "generator/count-lookahead-r1.pt": {
+      "sha256": "e3064cabb5bbd285b17d377bae472b422ee3038616de350329c1cb0a0daa59b9",
+      "bytes": 33191446
+    },
+    "generator/count-rollout-r1.pt": {
+      "sha256": "4f2665313736430854c6e787a87b8da8c2dadf76815329b086dd22f2f86ab8df",
+      "bytes": 33190832
+    },
+    "generator/count-teacher-r1.pt": {
+      "sha256": "ba25a0c202efd847a41caa7b3a08473e00a7c1191b823d3f950d4f87503ac791",
+      "bytes": 33190832
+    },
+    "generator/music-base-r1.pt": {
+      "sha256": "6df242026e873a3492cec8e2b94898c0f0b3b50e9694083814db6c05c1c6cd8c",
+      "bytes": 33189719
+    },
+    "generator/normalization.json": {
+      "sha256": "a984f91d26bc6a82fc4e9a98f1c9546fd1ff5edb86f685d63122edf09f76a2ed",
+      "bytes": 89148
+    },
+    "generator/phrase-reference.json": {
+      "sha256": "d7b1e3b5497a901b038b5af1b0171fa88408e57599669db0b0f84fdfc5317b68",
+      "bytes": 871798
+    },
+    "generator/style-statistics.json": {
+      "sha256": "de029b46b15c4e6693b45d28322b995de554c40aeb03f0737fdacbf87db409de",
+      "bytes": 288
+    },
+    "planner/arrangement-r1.pt": {
+      "sha256": "5c43c8b106be860a0fd5fb96bb4c0b1262778ffb19545d54010bcafc1c636326",
+      "bytes": 13954681
+    },
+    "planner/compiler.json": {
+      "sha256": "a25aef6883ecae870ce7c4d3c6c62f3969eb66b47b6e01a6df40732ed2c4fda1",
+      "bytes": 490
+    },
+    "planner/density-contrast-r1.pt": {
+      "sha256": "193e0cbd97ae7cdc2a01990833a2a7ccb1a88b2ac6728569dce5c32f894d3361",
+      "bytes": 279099
+    },
+    "planner/normalization.json": {
+      "sha256": "7c8f91bae083ee310254993a706b10f5c5d670fd6d046abe1f2bbe687cd492e2",
+      "bytes": 70819
+    },
+    "planner/role-balanced-r1.pt": {
+      "sha256": "2cf9fa1a04a21286cf7597bf3a21c6b84a9fa87dcba54bec300c4307452937c8",
+      "bytes": 4882055
+    },
+    "planner/role-standard-r1.pt": {
+      "sha256": "2ea281c9eb4d20f98982781964df48f9a05ba8098815906b0206e110a195ef35",
+      "bytes": 4882055
+    },
+    "planner/thresholds.npz": {
+      "sha256": "f14442646b296c994de649162aa7aae8e6f681f5a0d528b5e63b59078c3dc031",
+      "bytes": 278
+    },
+    "audio/beat-this/calibration.json": {
+      "sha256": "62797757a00528e77d8ec5c401578bcd148431f7a6e6a8cb2fe0844295e8fb96",
+      "bytes": 143
+    }
+  }
+}

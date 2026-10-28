@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keyloom-mania"
+version = "0.1.0"
+description = "Local music-conditioned osu!mania 4K chart generation and planning workbench"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "keyloom_mania/_vendor/omtk_pattern/LICENSE*"]
+authors = [{name = "Keyloom contributors"}]
+dependencies = [
+  "numpy>=1.26,<3", "av>=14,<20", "torch>=2.6,<3", "torchaudio>=2.6,<3",
+  "transformers==4.37.2", "einops>=0.8,<0.9", "mutagen>=1.47,<2", "rosu-pp-py>=4,<5",
+]
+
+[project.optional-dependencies]
+beats = ["beat-this==1.1.0"]
+dev = ["build>=1.2,<2"]
+
+[project.scripts]
+keyloom = "keyloom_mania.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ZhSM27/Keyloom"
+Repository = "https://github.com/ZhSM27/Keyloom"
+Issues = "https://github.com/ZhSM27/Keyloom/issues"
+
+[tool.setuptools]
+include-package-data = false
+packages = ["keyloom_mania", "keyloom_mania.studio", "keyloom_mania._vendor", "keyloom_mania._vendor.omtk_pattern", "keyloom_mania.resources", "keyloom_mania.generation_studio_web"]
+
+[tool.setuptools.package-data]
+"keyloom_mania.generation_studio_web" = ["*.html", "*.css", "*.js"]
+"keyloom_mania.resources" = ["*.json"]
+"keyloom_mania._vendor.omtk_pattern" = ["LICENSE*", "*.json"]

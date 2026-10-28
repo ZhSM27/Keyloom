@@ -1,0 +1,1 @@
+"""Packaged release resource catalog."""
