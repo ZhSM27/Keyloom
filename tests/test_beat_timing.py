@@ -5,7 +5,9 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
-from unittest.mock import patch
+import sys
+from types import ModuleType
+from unittest.mock import Mock, patch
 
 
 class GridFitTests(unittest.TestCase):
@@ -25,14 +27,22 @@ class GridFitTests(unittest.TestCase):
     def test_actual_detector_entry_applies_pinned_estimator_calibration(self):
         from keyloom_mania import beat_timing
         beats=.2039+np.arange(120)*(60/137.5)
+        tracker = Mock()
+        inference = ModuleType('beat_this.inference')
+        inference.Audio2Beats = tracker
+        optional_package = ModuleType('beat_this')
+        optional_package.__path__ = []
+        optional_package.inference = inference
         with tempfile.TemporaryDirectory() as directory:
             checkpoint=Path(directory)/'weights';checkpoint.write_bytes(b'tracker fixture')
             calibration=Path(directory)/'phase.json';calibration.write_text(json.dumps({'estimator_phase_bias_ms':30.9}),encoding='utf-8')
             with patch.object(beat_timing,'CHECKPOINT',checkpoint),patch.object(beat_timing,'CHECKPOINT_SHA256',hashlib.sha256(checkpoint.read_bytes()).hexdigest()), \
                  patch.object(beat_timing,'PHASE_CALIBRATION',calibration),patch.object(beat_timing,'PHASE_CALIBRATION_SHA256',hashlib.sha256(calibration.read_bytes()).hexdigest()), \
-                 patch('beat_this.inference.Audio2Beats') as tracker,patch('torch.cuda.is_available',return_value=False):
+                 patch.dict(sys.modules, {'beat_this': optional_package, 'beat_this.inference': inference}), \
+                 patch('torch.cuda.is_available',return_value=False):
                 tracker.return_value.return_value=(beats,beats[::4])
                 result=beat_timing.detect_timing(np.ones(24000,dtype=np.float32))
+                tracker.assert_called_once_with(checkpoint_path=str(checkpoint), device='cpu', dbn=False)
                 self.assertAlmostEqual(result['offset_ms'],173.,delta=.2)
                 self.assertEqual(result['fit_policy'],'absolute-consensus-v4')
                 self.assertEqual(result['phase_calibration_sha256'],hashlib.sha256(calibration.read_bytes()).hexdigest())

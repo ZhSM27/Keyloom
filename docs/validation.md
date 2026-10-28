@@ -6,7 +6,7 @@ Validation for the 0.1.0 source and r1 asset bundle:
 - Every released generator tensor compared equal to its retained source checkpoint; the inference-only rewrite removes training state and machine metadata.
 - All catalogued assets pass SHA-256 checks, and all four generators load natively with strict state dictionaries.
 - The wheel is installed into a separate directory and run from outside the checkout using existing third-party dependencies. This checks package independence from project source and private research modules; it is not a fresh operating-system installation.
-- Source, wheel and source distribution are scanned for absolute machine paths, credentials, weights, audio and unexpected large files. The GitHub Actions workflow repeats portable tests and package builds on Windows/Linux; hosted CI has not yet run before publication.
+- Source, wheel and source distribution are scanned for absolute machine paths, credentials, weights, audio and unexpected large files. [GitHub Actions](https://github.com/ZhSM27/Keyloom/actions) repeats portable tests and package builds on Windows/Linux. Timing adapter tests replace the optional beat-tracker interface and require no installed tracker or downloaded weights.
 
 Full audio-to-export smoke cases use 16 seconds of synthesized audio at explicit 120 BPM:
 
