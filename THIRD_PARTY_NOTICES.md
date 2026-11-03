@@ -16,6 +16,10 @@ The installer fetches verified upstream source with its LICENSE and README. `mus
 
 Optional automatic timing uses [Beat This!](https://github.com/CPJKU/beat_this), package `1.1.0`, by Francesco Foscarin, Jan Schlüter and Gerhard Widmer. Its [MIT license](https://github.com/CPJKU/beat_this/blob/main/LICENSE) is retained by the installed package. The optional `final0` checkpoint is downloaded from the upstream JKU host and verified with SHA-256 `8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331`. Inference uses `Audio2Beats(dbn=False)`; madmom models are not used.
 
+## Workbench fonts
+
+`keyloom_mania/generation_studio_web/app.js` embeds two unmodified WOFF2 fonts, loaded through the `FontFace` API: [Outfit](https://github.com/Outfitio/Outfit-Fonts) (variable, Latin subset; Copyright 2021 The Outfit Project Authors) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) Medium (Latin subset; Copyright 2020 The JetBrains Mono Project Authors). Both are licensed under the [SIL Open Font License 1.1](https://openfontlicense.org/). The fonts are not sold on their own.
+
 ## Installed dependencies
 
 PyTorch, torchaudio, NumPy, PyAV/FFmpeg, Transformers, einops, mutagen and rosu-pp-py are installed as dependencies and retain their own licenses. These dependencies are not relicensed by this repository. Consult their installed distribution metadata when redistributing an environment.
