@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "bundle_revision": 1,
+  "bundle_revision": 2,
   "default_generator": "music-base",
   "generators": [
     {

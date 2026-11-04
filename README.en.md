@@ -12,13 +12,13 @@ cd Keyloom
 python -m venv .venv
 # Activate the environment, then:
 python -m pip install -e ".[beats]"
-keyloom assets install keyloom-models-r1.zip
+keyloom assets install keyloom-models-r2.zip
 keyloom assets fetch-audio --beats
 keyloom doctor --load-models
 keyloom studio
 ```
 
-Download the matching [model bundle](https://github.com/ZhSM27/Keyloom/releases/download/v0.1.0/keyloom-models-r1.zip) from the [v0.1.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.1.0). MusicFM is fetched separately with pinned SHA-256 verification. A CUDA-enabled PyTorch installation is required for the workbench; offline CPU generation is supported:
+Download the matching [model bundle](https://github.com/ZhSM27/Keyloom/releases/download/v0.2.0/keyloom-models-r2.zip) from the [v0.2.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.2.0). MusicFM is fetched separately with pinned SHA-256 verification. A CUDA-enabled PyTorch installation is required for the workbench; offline CPU generation is supported:
 
 ```sh
 keyloom generate song.wav --bpm 120 --star 5 --device cpu

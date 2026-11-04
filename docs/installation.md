@@ -4,9 +4,9 @@ Python 3.11–3.13 is supported by the package metadata; Python 3.12 is the prim
 
 ## Resources
 
-1. Download [keyloom-models-r1.zip](https://github.com/ZhSM27/Keyloom/releases/download/v0.1.0/keyloom-models-r1.zip) from the [v0.1.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.1.0). Run `keyloom assets install <bundle.zip>`.
+1. Download [keyloom-models-r2.zip](https://github.com/ZhSM27/Keyloom/releases/download/v0.2.0/keyloom-models-r2.zip) from the [v0.2.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.2.0). Run `keyloom assets install <bundle.zip>`.
 2. Run `keyloom assets fetch-audio --beats`. Downloads use pinned SHA-256 values. MusicFM is required; Beat This! is optional for automatic BPM/offset detection. Without it, enter timing manually.
-3. Run `keyloom doctor --load-models --device cpu`. This checks the complete model resource catalog and MusicFM files, then loads all four generators. It does not measure musical quality or execute the complete audio encoder. Use `--device cuda` to exercise native model loading on the GPU.
+3. Run `keyloom doctor --load-models --device cpu`. This checks the complete model resource catalog and MusicFM files, then loads every installed generator. It does not measure musical quality or execute the complete audio encoder. Use `--device cuda` to exercise native model loading on the GPU.
 4. Run `keyloom studio` and open `http://127.0.0.1:8788/`.
 
 The source tree and wheel do not contain weights. An absent or corrupt resource produces an installation error; a different model is never silently substituted. Close the workbench before installing or upgrading a resource bundle. Verified resources are replaced individually; interrupted installation can be repaired by rerunning the installer.
@@ -17,7 +17,7 @@ The source tree and wheel do not contain weights. An absent or corrupt resource 
 
 ```text
 <application directory>/
-  assets/generator/       # four generators and shared inference statistics
+  assets/generator/       # five generators and shared inference statistics
   assets/planner/         # base planner, adapters and normalization
   assets/audio/musicfm/   # pinned upstream audio encoder resources
   assets/audio/beat-this/ # optional beat model and phase calibration

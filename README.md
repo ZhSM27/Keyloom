@@ -23,10 +23,10 @@ python -m pip install -e ".[beats]"
 
 GPU 工作台需要匹配的 CUDA 版 PyTorch 和 torchaudio，安装方法见 [PyTorch](https://pytorch.org/get-started/locally/)。CPU 用户可用离线生成命令。
 
-从 [v0.1.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.1.0) 下载匹配的 [keyloom-models-r1.zip](https://github.com/ZhSM27/Keyloom/releases/download/v0.1.0/keyloom-models-r1.zip)，然后：
+从 [v0.2.0 Release](https://github.com/ZhSM27/Keyloom/releases/tag/v0.2.0) 下载匹配的 [keyloom-models-r2.zip](https://github.com/ZhSM27/Keyloom/releases/download/v0.2.0/keyloom-models-r2.zip)，然后：
 
 ```sh
-keyloom assets install keyloom-models-r1.zip
+keyloom assets install keyloom-models-r2.zip
 keyloom assets fetch-audio --beats
 keyloom doctor --load-models
 keyloom studio

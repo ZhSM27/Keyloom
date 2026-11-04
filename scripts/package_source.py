@@ -4,7 +4,7 @@ from check_release import ROOT, source_files, inspect
 
 
 def main():
-    destination = ROOT / "dist/keyloom-0.1.0-source.zip"
+    destination = ROOT / "dist/keyloom-0.2.0-source.zip"
     destination.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in source_files():

@@ -1,5 +1,24 @@
 # Release validation
 
+Validation for the 0.2.0 source and r2 asset bundle:
+
+- Portable unit and regression suite: 205 tests, with no private training corpus or model downloads. [GitHub Actions](https://github.com/ZhSM27/Keyloom/actions) repeats it with the build and release checks on Windows and Linux.
+- `music-accent` adds only its new modules; every `music-base` tensor compared equal. All catalogued assets pass SHA-256 checks.
+- The wheel was installed into a separate directory and run from outside the checkout. `keyloom-models-r2.zip` installed 16 files into a new application directory, and the doctor loaded all five generators on CUDA.
+- The published `keyloom-models-r1.zip` still installs (15 files). The doctor passes and reports `music-accent` as not installed, requesting it fails with an installation error, `music-base` generates, and the workbench preselects `music-base`.
+- All release files were built from a clean clone and scanned for report files, absolute machine paths, personal data and credentials.
+
+Audio-to-export smoke cases from the installed wheel:
+
+| Generator | Device | Structure / star | Style | Audio | Exported notes / rows |
+| --- | --- | --- | --- | --- | --- |
+| music-accent | CUDA | peak-anchored / section | Jumpstream | 16 s synthetic, 120 BPM | 68 / 64 |
+| music-accent | CPU | legacy / global | Jumpstream | 16 s synthetic, 120 BPM | 65 / 64 |
+| music-base | CUDA | legacy / global | Jumpstream | 16 s synthetic, 120 BPM | 68 / 64 |
+| music-accent | CUDA | peak-anchored / section | Chordjacks | one real validation song, 138 BPM | 3437 / 1289 |
+
+On this sparse synthetic audio Chordjacks and Minijacks stop with the fewer-than-16-notes error for both `music-base` and `music-accent`, so the jack path was exercised on the real song. Measurements on 27 validation songs are in [accent alignment](accent-alignment-plan.md). These are engineering checks, not listening or playability evaluation: the released `music-accent` configuration has not been playtested.
+
 Validation for the 0.1.0 source and r1 asset bundle:
 
 - Portable unit and regression suite: 137 tests, with no private training corpus or model downloads.
