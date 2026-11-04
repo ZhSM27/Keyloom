@@ -2,6 +2,7 @@
 import argparse
 import json
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -34,6 +35,23 @@ def main(argv=None):
     generate.add_argument("--budget", choices=("legacy", "count-reference"), default="legacy")
     generate.add_argument("--coordination", default="legacy")
     generate.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    evaluate = commands.add_parser("evaluate", help="Score charts against human reference charts").add_subparsers(dest="action", required=True)
+    reference = evaluate.add_parser("reference", help="Build a human reference profile from chart folders")
+    reference.add_argument("roots", type=Path, nargs="*", help="osu! Songs folders, the osu!lazer files folder or chart files")
+    reference.add_argument("--manifest", type=Path, action="append", default=[], help="corpus manifest.jsonl pairing charts with audio")
+    reference.add_argument("--split", action="append", default=None, help="manifest splits to include (default: train only)")
+    reference.add_argument("--output", type=Path)
+    reference.add_argument("--max-hold-fraction", type=float, default=.1)
+    reference.add_argument("--min-notes", type=int, default=200)
+    reference.add_argument("--no-audio", action="store_true")
+    reference.add_argument("--workers", type=int)
+    chart = evaluate.add_parser("chart", help="Evaluate .osz packages, .osu charts or generation folders")
+    chart.add_argument("charts", type=Path, nargs="+")
+    chart.add_argument("--reference", type=Path)
+    chart.add_argument("--neighbors", type=int, default=40)
+    chart.add_argument("--no-audio", action="store_true")
+    chart.add_argument("--json", type=Path, help="Also write the complete reports as JSON")
+    chart.add_argument("--markdown", type=Path, help="Also write the printed report as UTF-8 Markdown")
     args = parser.parse_args(argv)
     try:
         if args.command == "studio":
@@ -53,6 +71,8 @@ def main(argv=None):
             result = check(load_models=args.load_models, device=args.device)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["ok"] else 1
+        elif args.command == "evaluate":
+            return _evaluate(args)
         else:
             from .studio.config import OUTPUT_ROOT
             from .studio.pipeline import _generate_song
@@ -75,3 +95,37 @@ def main(argv=None):
     except (ValueError, OSError, RuntimeError) as error:
         parser.exit(1, f"Error: {error}\n")
     return 0
+
+
+def _evaluate(args):
+    from . import evaluation
+
+    # Legacy console code pages cannot encode every report symbol; never fail on output.
+    sys.stdout.reconfigure(errors="replace")
+    if args.action == "reference":
+        if not args.roots and not args.manifest:
+            raise ValueError("Give chart folders or at least one --manifest.")
+        profile = evaluation.build_reference(args.roots, args.output or evaluation.DEFAULT_REFERENCE,
+            manifests=args.manifest, splits=tuple(args.split or ("train",)), maximum_hold_fraction=args.max_hold_fraction, minimum_notes=args.min_notes,
+            with_audio=not args.no_audio, workers=args.workers)
+        print(json.dumps(profile["summary"], ensure_ascii=False, indent=2))
+        print(f"Reference: {args.output or evaluation.DEFAULT_REFERENCE}")
+        return 0
+    reference_path = args.reference or evaluation.DEFAULT_REFERENCE
+    reference = evaluation.load_reference(reference_path) if args.reference or reference_path.is_file() else None
+    if reference is None:
+        print("No human reference profile; printing raw metrics only. Run `keyloom evaluate reference <folders>`.\n")
+    reports, sections = [], []
+    for path in args.charts:
+        with evaluation.load_chart(path) as chart:
+            reports.append(evaluation.evaluate_chart(chart, reference, with_audio=not args.no_audio, neighbor_count=args.neighbors))
+        sections.append(evaluation.render_markdown(reports[-1]))
+        print(sections[-1] + "\n", flush=True)
+    if len(reports) > 1 and reference is not None:
+        sections.append(evaluation.render_comparison(reports))
+        print(sections[-1])
+    if args.markdown:
+        args.markdown.write_text("\n\n".join(sections) + "\n", encoding="utf-8")
+    if args.json:
+        args.json.write_text(json.dumps(reports, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    return 0 if all(report["overall"]["gate_passed"] for report in reports) else 2

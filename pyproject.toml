@@ -30,7 +30,7 @@ Issues = "https://github.com/ZhSM27/Keyloom/issues"
 
 [tool.setuptools]
 include-package-data = false
-packages = ["keyloom_mania", "keyloom_mania.studio", "keyloom_mania._vendor", "keyloom_mania._vendor.omtk_pattern", "keyloom_mania.resources", "keyloom_mania.generation_studio_web"]
+packages = ["keyloom_mania", "keyloom_mania.studio", "keyloom_mania.evaluation","keyloom_mania._vendor", "keyloom_mania._vendor.omtk_pattern", "keyloom_mania.resources", "keyloom_mania.generation_studio_web"]
 
 [tool.setuptools.package-data]
 "keyloom_mania.generation_studio_web" = ["*.html", "*.css", "*.js"]
