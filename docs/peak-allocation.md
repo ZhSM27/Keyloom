@@ -26,7 +26,7 @@ The same file stores `star_from_peak_nps`, a least-squares fit of star rating on
 
 ## Generator star condition (`star_condition_id`)
 
-The generator was trained with each chart's global star in every window. `global` (default) keeps that. `section` (CLI `--star-condition section`) needs `peak-anchored` and gives each window the star a human chart would have if that section's shaped density were its peak:
+The generator was trained with each chart's global star in every window. `global` (the command-line default; the workbench preselects `section`) keeps that. `section` (CLI `--star-condition section`) needs `peak-anchored` and gives each window the star a human chart would have if that section's shaped density were its peak:
 
 `local star = target − min(1.5, −slope · ln(section density / peak reference))`, never below 2★.
 

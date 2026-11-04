@@ -28,7 +28,7 @@ from .generator_density import BUDGET_OPTIONS, BUDGET_VERSION, DIAGNOSTIC_VERSIO
 from .role_planner_runtime import arrangement_options, resolve_arrangement_model
 from .segment_labels import LABELS
 
-from .studio.config import (WEB_ROOT, PLANNER_CHECKPOINT, PLAN_ARTIFACT, PLAN_ANALYSIS,
+from .studio.config import (WEB_ROOT, WORKBENCH_DEFAULTS, PLANNER_CHECKPOINT, PLAN_ARTIFACT, PLAN_ANALYSIS,
     PLANNER_NORMALIZATION, GENERATOR_NORMALIZATION, STYLE_STATISTICS, DEFAULT_MUSICFM_ASSETS,
     MUSICFM_REQUIRED_ASSETS, OUTPUT_ROOT, MAX_UPLOAD_BYTES, ALLOWED_EXTENSIONS,
     BAR_BEATS, CANDIDATES_PER_BEAT, STUDIO_RUNTIME_VERSION, STUDIO_PORT, STUDIO_URL)
@@ -227,10 +227,9 @@ class StudioApp:
         missing_assets = [value.name for value in required_assets if not value.is_file()]
         generator_options = public_generator_models(verify_integrity=False)
         available_generators = [model for model in generator_options if model["available"]]
-        default_generator = next(
-            (model for model in generator_options if model["id"] == DEFAULT_GENERATOR_MODEL_ID and model["available"]),
-            None,
-        )
+        # An install without the candidate's asset still opens on the baseline.
+        default_generator = next((model for wanted in (WORKBENCH_DEFAULTS["generator"], DEFAULT_GENERATOR_MODEL_ID)
+                                  for model in generator_options if model["id"] == wanted and model["available"]), None)
         try:
             import torch
             from .playstyle_control import DECODER_VERSION
@@ -262,14 +261,14 @@ class StudioApp:
             "model_catalog_sha256": hash_file(CATALOG_PATH),
             "planner_policy_version": ROLE_STYLE_VERSION,
             "density_options": named_options("planner/density", density_options()),
-            "default_density_model_id": "fixed",
+            "default_density_model_id": WORKBENCH_DEFAULTS["density"],
             "arrangement_options": named_options("planner/role", arrangement_options()),
-            "default_arrangement_model_id": "rule",
-            "coordination_options":list(COORDINATION_OPTIONS),"default_coordination_id":"legacy",
+            "default_arrangement_model_id": WORKBENCH_DEFAULTS["arrangement"],
+            "coordination_options":list(COORDINATION_OPTIONS),"default_coordination_id":WORKBENCH_DEFAULTS["coordination"],
             "coordination_version":COORDINATION_VERSION,
-            "structure_options":list(STRUCTURE_OPTIONS), "default_structure_id":"legacy", "hierarchy_version":HIERARCHY_VERSION, "peak_allocation_version":PEAK_VERSION,
-            "star_condition_options":list(STAR_CONDITION_OPTIONS), "default_star_condition_id":"global", "local_star_version":LOCAL_STAR_VERSION,
-            "budget_options":list(BUDGET_OPTIONS), "default_budget_id":"legacy",
+            "structure_options":list(STRUCTURE_OPTIONS), "default_structure_id":WORKBENCH_DEFAULTS["structure"], "hierarchy_version":HIERARCHY_VERSION, "peak_allocation_version":PEAK_VERSION,
+            "star_condition_options":list(STAR_CONDITION_OPTIONS), "default_star_condition_id":WORKBENCH_DEFAULTS["star_condition"], "local_star_version":LOCAL_STAR_VERSION,
+            "budget_options":list(BUDGET_OPTIONS), "default_budget_id":WORKBENCH_DEFAULTS["budget"],
             "budget_version":BUDGET_VERSION, "execution_diagnostic_version":DIAGNOSTIC_VERSION,
             "planner_integration_version":"planner-suite-r1",
             "generator_source_runtime":"installed-package",

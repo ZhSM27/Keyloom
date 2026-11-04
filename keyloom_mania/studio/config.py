@@ -12,6 +12,10 @@ GENERATOR_NORMALIZATION = ASSET_ROOT / "generator/normalization.json"
 STYLE_STATISTICS = ASSET_ROOT / "generator/style-statistics.json"
 PHRASE_REFERENCE = ASSET_ROOT / "generator/phrase-reference.json"
 DEFAULT_GENERATOR_MODEL_ID = "music-base"
+# What the workbench preselects, so a playtest uses the newest options without manual switching. This is not a
+# promotion: the command line and the catalog keep the baseline, and every baseline option stays selectable.
+WORKBENCH_DEFAULTS = {"generator": "music-accent", "structure": "peak-anchored", "star_condition": "section",
+                      "arrangement": "rule", "density": "fixed", "coordination": "legacy", "budget": "legacy"}
 GENERATOR_CHECKPOINT = ASSET_ROOT / "generator/music-base-r1.pt"
 DEFAULT_MUSICFM_ASSETS = ASSET_ROOT / "audio/musicfm"
 MUSICFM_REQUIRED_ASSETS = tuple(DEFAULT_MUSICFM_ASSETS / name for name in (

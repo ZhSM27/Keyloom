@@ -34,6 +34,14 @@
       "description": "使用生成计数前文训练的研究候选。",
       "checkpoint": "generator/count-rollout-r1.pt",
       "architecture": "count-context-v1"
+    },
+    {
+      "id": "music-accent",
+      "revision": 1,
+      "label": "踩音押数 · 候选 r1",
+      "description": "在基线上按音频支撑调整押数，保留叠压串，并让布局呼应前面相似的小节；试玩候选。",
+      "checkpoint": "generator/music-accent-r1.pt",
+      "architecture": "accent-count-v1"
     }
   ],
   "roles": [
@@ -82,6 +90,11 @@
     "generator/count-teacher-r1.pt": {
       "sha256": "ba25a0c202efd847a41caa7b3a08473e00a7c1191b823d3f950d4f87503ac791",
       "bytes": 33190832
+    },
+    "generator/music-accent-r1.pt": {
+      "optional": true,
+      "sha256": "538cb196f30285ef26998d093726d289e10420e5f38cccf9c5c12138ed96dc00",
+      "bytes": 33500653
     },
     "generator/music-base-r1.pt": {
       "sha256": "6df242026e873a3492cec8e2b94898c0f0b3b50e9694083814db6c05c1c6cd8c",

@@ -20,7 +20,9 @@ def install_bundle(bundle, root=None):
         with zipfile.ZipFile(bundle) as archive:
             entries = archive.infolist()
             names = [entry.filename for entry in entries]
-            if len(names) != len(set(names)) or set(names) != set(expected):
+            # Optional files (candidates outside the versioned bundle) are verified when present.
+            required = {name for name, specification in expected.items() if not specification.get("optional")}
+            if len(names) != len(set(names)) or not required <= set(names) <= set(expected):
                 raise ValueError("Bundle must contain exactly the catalogued resource files.")
             for entry in entries:
                 specification = expected[entry.filename]
@@ -36,11 +38,11 @@ def install_bundle(bundle, root=None):
                 if digest.hexdigest() != specification["sha256"]:
                     raise ValueError(f"Incorrect asset checksum: {entry.filename}")
         # Validation is complete before touching the installed resource set.
-        for name in expected:
+        for name in names:
             destination = asset_path(name, root=root)
             destination.parent.mkdir(parents=True, exist_ok=True)
             os.replace(staging / name, destination)
-    return len(expected)
+    return len(names)
 
 
 def download_asset(destination, specification):

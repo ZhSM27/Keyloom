@@ -48,11 +48,18 @@ class PlaystyleControlConfig:
     jack_period_strength: float = 2.5
     cut_phrase_context: bool = False
     cut_context_strength: float = .6
+    # Opt-in shorter ordinary chains per style: (label, ceiling, chance of one more hit). The penalty starts at the
+    # ceiling and the rare extension beyond it keeps jack_extended_chance. Empty keeps the cap of four.
+    jack_style_ceilings: tuple = ()
 
     def __post_init__(self):
         for chance in (self.minijack_triple_chance, self.jack_extended_chance):
             if not math.isfinite(chance) or not 0 <= chance <= 1:
                 raise ValueError("Jack extension chances must be probabilities.")
+        for label, ceiling, chance in self.jack_style_ceilings:
+            if label not in JACK_STYLES or label == "Minijacks" or not isinstance(ceiling, int) or not 2 <= ceiling <= 4 \
+                    or not math.isfinite(chance) or not 0 <= chance <= 1:
+                raise ValueError("Jack style ceilings need an ordinary jack style, a ceiling of 2..4 and a probability.")
         positive = (self.double_history_beats, self.double_pseudocount, self.double_temperature, self.double_logit_window,
                     self.jack_temperature,self.jack_logit_window)
         nonnegative = (self.double_bias_strength, self.double_maximum_bias,self.jack_repeat_reward,self.jack_period_strength,self.cut_context_strength)
@@ -109,6 +116,13 @@ class PlaystyleLaneControlState(LaneControlState):
         extra = (self.run_draw < chance).long() + (self.run_draw < chance / 2).long()
         extra += (self.run_draw < chance / 4).long() + (self.run_draw < chance / 8).long()
         limits = torch.where(mini[:, None], mini_limit, 4 + extra)
+        soft = torch.where(mini[:, None], 2, 4).expand_as(limits)
+        for label, ceiling, longer in self.playstyle.jack_style_ceilings:
+            style = (styles == LABELS.index(label))[:, None]
+            # One more hit with probability `longer`; beyond that only the usual rare extension.
+            short = ceiling + (self.run_draw < longer).long() + (self.run_draw < longer * chance).long()
+            limits = torch.where(style, short, limits)
+            soft = torch.where(style, ceiling, soft)
         cooling = beats[:, None] - self.last_hit < self.config.minimum_gap_beats - 1e-7
         blocked = cooling | ((runs >= limits) & ~longjack[:, None])
         jack_legal = ~(blocked[:, None] & self.mask_columns[None]).any(dim=-1)
@@ -124,7 +138,6 @@ class PlaystyleLaneControlState(LaneControlState):
 
         # Shared-column reward keeps normal jacks available, while progressive
         # penalties make third mini hits and fifth ordinary hits less attractive.
-        soft = torch.where(mini[:, None], 2, 4)
         excess = (runs + 1 - soft).clamp_min(0).float()
         run_penalty = 6.0 * (excess.square() @ self.mask_columns.float().T)
         overlap = (self.mask_columns[self.last_mask][:, None] & self.mask_columns[None]).sum(dim=-1)
@@ -154,7 +167,7 @@ class PlaystyleLaneControlState(LaneControlState):
         return {**super().summary(), "decoder_version": DECODER_VERSION, "playstyle": asdict(self.playstyle),
                 "maximum_sixteenth_column_runs": self.maximum_sixteenth_runs.cpu().tolist(),
                 "maximum_hand_runs": self.maximum_hand_runs.cpu().tolist(),
-                "run_policy": "Minijacks cap 2, occasional 3, at most five consecutive occupied rows per hand (12 counts once); ordinary jacks cap 4, rare 5..8; explicitly planned Longjacks have no run/mask/hand cap; same-column speed limit always applies."}
+                "run_policy": "Minijacks cap 2, occasional 3, at most five consecutive occupied rows per hand (12 counts once); ordinary jacks cap 4, rare 5..8 (optional shorter per-style ceilings); explicitly planned Longjacks have no run/mask/hand cap; same-column speed limit always applies."}
 
 
 class PlaystylePhraseControlState(PhraseControlState):

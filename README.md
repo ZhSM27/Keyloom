@@ -50,8 +50,9 @@ keyloom generate song.wav --bpm 120 --offset 0 --star 5 --style Jumpstream --dev
 | `count-lookahead` | 计数前文 · 前瞻对照 r1 | 前瞻开关对照 |
 | `count-teacher` | 计数前文 · 真值前文 r1 | 真实前文训练研究对照 |
 | `count-rollout` | 计数前文 · 生成前文 r1 | 生成前文训练研究候选 |
+| `music-accent` | 踩音押数 · 候选 r1 | 按音频支撑调整押数并加入小节呼应的试玩候选 |
 
-每个系列独立使用 `r1`、`r2` 修订号。所有选项均为研究版本，默认基线不代表质量认证。Planner 保留最新 `hierarchical` 段落—乐句规划与 `legacy` 原方案；条件编排保留标准/主副均衡，密度保留原密度/段落对比。最新方案尚未自动晋升默认。
+每个系列独立使用 `r1`、`r2` 修订号。所有选项均为研究版本，默认基线不代表质量认证。Planner 保留最新 `hierarchical` 段落—乐句规划与 `legacy` 原方案；条件编排保留标准/主副均衡，密度保留原密度/段落对比。工作台默认预选最新选项（`music-accent`、峰值锚定、局部难度条件），便于试玩，这不代表模型晋升；命令行和目录的默认仍是基线，基线选项全部保留。
 
 ## 目录与数据
 
@@ -78,5 +79,7 @@ python -m unittest discover -s tests -v
 python scripts/check_release.py
 python -m build
 ```
+
+用 `keyloom evaluate chart a.osz b.osz` 对照本机人类谱面筛查键型兑现、2/4 拍手部压力、排键与节奏自然度，用法与边界见[评测说明](docs/evaluation.md)。分数只用于筛查，不替代试听试玩。
 
 源码采用 [MIT](LICENSE)；第三方组件和外部权重见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。发布步骤见 [docs/releasing.md](docs/releasing.md)。

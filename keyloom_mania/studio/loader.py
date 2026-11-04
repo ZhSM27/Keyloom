@@ -10,6 +10,7 @@ def _generated_plan_model(checkpoint_path: Path = GENERATOR_CHECKPOINT, *, devic
     from ..expression_generator import ExpressionGenerator
     from ..music_count_natural import MusicCountNaturalGenerator
     from ..count_continuation import CountContinuationGenerator
+    from ..accent_count import AccentCountGenerator
     from ..main_style import STYLE_NAMES as ALL_STYLE_NAMES
     from ..rhythm_decode import RhythmDecodedGenerator, configure_rhythm_decoding
     from ..tiny_model import TinyModelConfig
@@ -18,7 +19,8 @@ def _generated_plan_model(checkpoint_path: Path = GENERATOR_CHECKPOINT, *, devic
     config = dict(checkpoint["model_config"])
     architecture = config.pop("architecture", "factorized")
     accepted = {name: value for name, value in config.items() if name in TinyModelConfig.__dataclass_fields__}
-    constructors = {"music-count-v1": MusicCountNaturalGenerator, "count-context-v1": CountContinuationGenerator}
+    constructors = {"music-count-v1": MusicCountNaturalGenerator, "count-context-v1": CountContinuationGenerator,
+                    "accent-count-v1": AccentCountGenerator}
     if architecture not in constructors:
         raise ValueError(f"Unsupported generator architecture: {architecture}")
     model_class = constructors[architecture]
@@ -53,6 +55,8 @@ def _generated_plan_model(checkpoint_path: Path = GENERATOR_CHECKPOINT, *, devic
         expected_reference=policy.get('phrase_reference_sha256')
         if expected_reference and hash_file(verify_asset('generator/phrase-reference.json'))!=expected_reference:
             raise ValueError('The reviewed concrete phrase reference has changed.')
+    if isinstance(model, AccentCountGenerator):
+        model.configure_decoding(checkpoint.get('inference_policy', {}).get('accent_decoding'))
     configure_rhythm_decoding(model, "learned-grid") if isinstance(model, RhythmDecodedGenerator) else None
     if len(ALL_STYLE_NAMES) != 16:
         raise ValueError("Unexpected 4K Planner style vocabulary.")

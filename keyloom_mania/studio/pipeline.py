@@ -355,7 +355,8 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
     style_limits = tuple(tuple(row) for row in _read_json(STYLE_STATISTICS)['style_run_limits'])
     from ..playstyle_control import PlaystyleControlConfig
     lane_state, phrase_state = studio_playstyle_controls(device, selected_styles, style_limits,
-        PlaystyleControlConfig(cut_phrase_context=bool(getattr(model,'expression_decoding',False))))
+        PlaystyleControlConfig(cut_phrase_context=bool(getattr(model,'expression_decoding',False)),
+                               jack_style_ceilings=tuple(getattr(model,'jack_style_ceilings',()))))
     previous_end_ms = None
     previous_start = None
     history_masks: dict[int, int] = {}
@@ -364,10 +365,16 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
     music_count_summary=None
     density_alignment_summary=None
     expression_summary=None
+    support_summary=None
     music_planned_notes=0
     music_plan_digest=hashlib.sha256()
     music_planned_rows=0
     execution_ledger = ExecutionLedger()
+    from ..accent_count import AccentCountGenerator
+    accent_frames = None
+    if isinstance(model, AccentCountGenerator):
+        from ..accent_features import accent_frames as compute_accents
+        accent_frames = compute_accents(waveform)
     normalized_generator = {
         "music": _normalize_features(music, local_statistics, "music"),
         "acoustic": _normalize_features(acoustic, local_statistics, "acoustic"),
@@ -398,6 +405,9 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
             "condition": torch.from_numpy(condition).to(device),
             "plan": torch.from_numpy(plan_window[None]).to(device),
         }
+        if accent_frames is not None:
+            from ..accent_features import sample_accents
+            batch["accent"] = torch.from_numpy(np.clip(sample_accents(accent_frames, times), -5, 20)[None].astype(np.float32)).to(device)
         if hasattr(model, "density_projection"):
             bar_indices = (np.arange(start_beat, start_beat + 8) // 4).clip(0, len(bar_plan) - 1)
             per_beat = generator_density[bar_indices, np.arange(start_beat, start_beat + 8) % 4].astype(np.float32)
@@ -443,6 +453,23 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
             else:
                 for key in ('viability_scored_rows','stream_scored_rows','music_sampled_rows','music_nonmodal_rows','sampling_log_regret_sum','density_guarded_rows','density_infeasible_rows','protected_count_changes','protected_music_rows','hand_pressure_scored_rows','supported_double_restorations','learned_music_count_changed_rows','learned_music_count_net_notes','learned_count_lookahead_changed_rows'):
                     expression_summary[key]=expression_summary.get(key,0)+generated['phrase_expression'].get(key,0)
+        if 'accent_support' in generated:
+            # Rows the planner and onset head wanted but the recording does not support; kept visible per row.
+            detail=generated['accent_support']
+            if support_summary is None:
+                support_summary={'decided_rows':0,'stream_protected_rows':0,'dropped_rows':0,'demoted_rows':0,'demoted_notes':0,
+                                 'size_lowered_rows':0,'size_lowered_notes':0,'size_raised_rows':0,'size_raised_notes':0,
+                                 'motif_scored_rows':0,'motif_matched_rows':0,
+                                 'dropped_times_ms':[],'policy':model.configuration().get('support_decoding')}
+            for key in ('decided_rows','stream_protected_rows','demoted_rows','demoted_notes','size_lowered_rows','size_lowered_notes',
+                        'size_raised_rows','size_raised_notes','motif_scored_rows','motif_matched_rows'):
+                support_summary[key]+=detail[key]
+            dropped=[int(round(times[slot])) for slot in detail['dropped_slots'] if 0<=times[slot]<=duration_ms]
+            support_summary['dropped_rows']+=len(dropped)
+            support_summary['dropped_times_ms']+=dropped
+            if 'trace' in detail:
+                support_summary.setdefault('trace',[]).append({'times_ms':[round(float(value),1) for value in times[prefix_slots:]],
+                    **{key:values[prefix_slots:] for key,values in detail['trace'].items()}})
         if 'music_count_control' in generated:
             detail=generated['music_count_control']
             if music_count_summary is None:music_count_summary=dict(detail)
@@ -636,6 +663,7 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
         "model_architecture":model_architecture,
         "music_count_control":music_count_summary,
         "phrase_expression":expression_summary,
+        "accent_support":support_summary,
         "generation_runtime_version":STUDIO_RUNTIME_VERSION,
         "model_identity": model_identity,
         "generator_runtime_policy":generator_runtime_policy,

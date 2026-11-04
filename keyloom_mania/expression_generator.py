@@ -298,7 +298,10 @@ class ExpressionGenerator(NaturalLayoutGenerator):
                     self._expression_stats['supported_double_restorations']=int((changed&approved).sum())
                     changed=changed&~approved
                 if getattr(self,'learned_music_counts',False):
-                    learned=plan[:,prefix_slots:,[LABELS.index(s) for s in ('Jacks','Chordjacks','Minijacks','Gluts')]].amax(-1)>.5
+                    styles=getattr(self,'learned_count_styles',('Jacks','Chordjacks','Minijacks','Gluts'))
+                    # A model that learns counts for every style leaves no row protected, mixed plan rows included.
+                    learned=(torch.ones_like(protected) if set(styles)==set(LABELS)
+                             else plan[:,prefix_slots:,[LABELS.index(s) for s in styles]].amax(-1)>.5)
                     self._expression_stats['learned_music_count_changed_rows']=int((changed&learned).sum())
                     delta=result['music_counts'][:,prefix_slots:]-reference_result['music_counts'][:,prefix_slots:]
                     self._expression_stats['learned_music_count_net_notes']=int((delta*learned).sum())

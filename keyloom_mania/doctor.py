@@ -1,10 +1,15 @@
 """Explicit integrity and native-load checks without a local training checkout."""
-from .catalog import catalog, verify_asset
+from .catalog import asset_path, catalog, verify_asset
 
 
 def check(*, load_models=False, device="cpu"):
     result = {"ok": True, "assets": {}, "models": {}, "device": device}
-    for name in catalog()["files"]:
+    files = catalog()["files"]
+    optional_missing = {name for name, specification in files.items() if specification.get("optional") and not asset_path(name).is_file()}
+    for name in files:
+        if name in optional_missing:
+            result["assets"][name] = "optional; not installed"
+            continue
         try:
             verify_asset(name)
             result["assets"][name] = "ok"
@@ -22,6 +27,9 @@ def check(*, load_models=False, device="cpu"):
     if load_models:
         from .studio.loader import _generated_plan_model
         for model in catalog()["generators"]:
+            if model["checkpoint"] in optional_missing:
+                result["models"][model["id"]] = "optional; not installed"
+                continue
             try:
                 _generated_plan_model(verify_asset(model["checkpoint"]), device=device)
                 result["models"][model["id"]] = "native load ok"

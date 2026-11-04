@@ -24,8 +24,10 @@ Download the matching [model bundle](https://github.com/ZhSM27/Keyloom/releases/
 keyloom generate song.wav --bpm 120 --star 5 --device cpu
 ```
 
+`keyloom evaluate chart a.osz b.osz` screens charts against your local human charts for style realization and 2/4-beat hand-pressure, layout and rhythm naturalness; see [chart evaluation](docs/evaluation.md). Scores screen candidates and never replace listening or playtests.
+
 The only workbench endpoint is `http://127.0.0.1:8788/`. Resources and outputs live outside the checkout in the platform user-data directory, overridable with `KEYLOOM_HOME`.
 
-Public generators: `music-base`, `count-lookahead`, `count-teacher`, `count-rollout`, all revision `r1`. The hierarchical planner remains opt-in alongside the baseline. Current output is constant-tempo, four-key tap charts; long notes and variable-tempo maps are unsupported. Requested difficulty is a condition, not a guaranteed output rating.
+Public generators: `music-base`, `count-lookahead`, `count-teacher`, `count-rollout`, `music-accent`, all revision `r1`. The hierarchical planner remains opt-in alongside the baseline. Current output is constant-tempo, four-key tap charts; long notes and variable-tempo maps are unsupported. Requested difficulty is a condition, not a guaranteed output rating.
 
 The repository includes inference and portable regression tests, not the private training corpus or historical experiment scripts. MIT-licensed source; see [third-party notices](THIRD_PARTY_NOTICES.md).
