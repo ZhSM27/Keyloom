@@ -28,7 +28,9 @@ def main(argv=None):
     generate.add_argument("--model", default="music-base")
     generate.add_argument("--role", choices=("rule", "standard", "balanced"), default="rule")
     generate.add_argument("--density", choices=("fixed", "contrast"), default="fixed")
-    generate.add_argument("--structure", choices=("legacy", "hierarchical"), default="legacy")
+    generate.add_argument("--structure", choices=("legacy", "hierarchical", "peak-anchored"), default="legacy")
+    generate.add_argument("--star-condition", choices=("global", "section"), default="global",
+                          help="section: lower the generator star in non-peak sections (requires --structure peak-anchored)")
     generate.add_argument("--budget", choices=("legacy", "count-reference"), default="legacy")
     generate.add_argument("--coordination", default="legacy")
     generate.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
@@ -58,7 +60,7 @@ def main(argv=None):
             settings = {"bpm": args.bpm, "first_beat_ms": args.offset, "target_star": args.star,
                 "main_style": args.style, "secondary_styles": args.secondary, "model_id": args.model,
                 "arrangement_model_id": args.role, "density_model_id": args.density,
-                "structure_id": args.structure, "budget_id": args.budget, "coordination_id": args.coordination,
+                "structure_id": args.structure, "star_condition_id": args.star_condition, "budget_id": args.budget, "coordination_id": args.coordination,
                 "title": args.audio.stem, "artist": "Unknown artist"}
             validate_settings(settings)
             if not args.audio.is_file():

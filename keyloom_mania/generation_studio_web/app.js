@@ -67,6 +67,8 @@ const state = {
   selectedDensityId: "fixed",
   selectedArrangementId: "rule",
   selectedStructureId: "legacy",
+  selectedStarConditionId: "global",
+  starConditionOptions: [],
   selectedCoordinationId: "legacy",
   selectedBudgetId: "legacy",
   budgetOptions: [],
@@ -81,6 +83,25 @@ const state = {
 };
 
 function setText(selector, value) { $(selector).textContent = value; }
+
+// Options that need another structure stay visible but disabled until it is chosen.
+function renderStarConditionOptions() {
+  const root = $("#starConditionSelect");
+  root.replaceChildren();
+  for (const item of state.starConditionOptions) {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.label + (item.status === "research" ? "（研究）" : "");
+    option.disabled = item.available === false
+      || (item.requires_structure_id && item.requires_structure_id !== state.selectedStructureId);
+    root.append(option);
+  }
+  const selected = state.starConditionOptions.find(item => item.id === state.selectedStarConditionId);
+  if (!selected || (selected.requires_structure_id && selected.requires_structure_id !== state.selectedStructureId)) {
+    state.selectedStarConditionId = "global";
+  }
+  root.value = state.selectedStarConditionId;
+}
 
 function formatDuration(ms) {
   const total = Math.max(0, Math.floor(Number(ms || 0) / 1000));
@@ -150,6 +171,9 @@ function renderModelOptions(health) {
   }
   state.selectedStructureId = health.default_structure_id || "legacy";
   structureRoot.value = state.selectedStructureId;
+  state.starConditionOptions = health.star_condition_options || [{id: "global", label: "全曲统一难度条件", available: true}];
+  state.selectedStarConditionId = health.default_star_condition_id || "global";
+  renderStarConditionOptions();
   const coordinationRoot = $("#coordinationSelect");
   coordinationRoot.replaceChildren();
   for (const item of health.coordination_options || [{id: "legacy", label: "原编排与密度执行"}]) {
@@ -340,6 +364,7 @@ function updateGenerateButton() {
   $("#densitySelect").disabled = state.uploading || state.busy;
   $("#arrangementSelect").disabled = state.uploading || state.busy;
   $("#structureSelect").disabled = state.uploading || state.busy;
+  $("#starConditionSelect").disabled = state.uploading || state.busy;
   $("#coordinationSelect").disabled = state.uploading || state.busy;
   $("#budgetSelect").disabled = state.uploading || state.busy;
   if (state.busy) {
@@ -525,8 +550,16 @@ function setResult(job) {
   const unused = (manifest.unused_secondary_styles || []).map(item => item.style);
   const unusedDetail = unused.length ? ` · 未独立成段的副型：${unused.join("、")}` : "";
   setText("#previewSubtitle", `${manifest.bpm.toFixed(1)} BPM · ${formatDuration(manifest.audio_duration_ms)} · ${styleSummary} · 主副键型按音乐段落安排${unusedDetail}`);
-  if (manifest.structure_id === "hierarchical") {
+  if (manifest.structure_id === "hierarchical" || manifest.structure_id === "peak-anchored") {
     setText("#previewSubtitle", `${manifest.bpm.toFixed(1)} BPM · ${styleSummary} · ${manifest.hierarchy_sections} 个段落 / ${manifest.hierarchy_phrases} 个乐句 · 粉线为段落边界，白线为乐句边界${unusedDetail}`);
+  }
+  if (manifest.structure_id === "peak-anchored" && manifest.hierarchy_density) {
+    const shaping = manifest.hierarchy_density;
+    const sections = shaping.sections || [];
+    const peak = sections.filter(item => item.tier === "peak").length;
+    const reduced = sections.filter(item => item.tier === "reduced").length;
+    const change = (Number(shaping.note_budget_change) * 100).toFixed(1);
+    setText("#previewSubtitle", `${$("#previewSubtitle").textContent} · 峰值段 ${peak} 个保持原密度，${reduced} 个段落降密 · 计划音符 ${change}%`);
   }
   setText("#downloadDetail", `${manifest.model_label || "已选模型"} · ${manifest.arrangement_model_label || "规则编排"} · ${manifest.density_model_label || "原 Planner 密度"} · ${manifest.coordination_label || "原执行"} · 实际难度 ${Number(manifest.actual_star).toFixed(2)}★ · 可导入 osu!lazer 游玩`);
   $("#downloadLink").href = `/api/download/${state.sessionId}`;
@@ -538,6 +571,14 @@ function setResult(job) {
     const budget = manifest.density_budget || {};
     const mae = execution.notes_beat_mae == null ? "—" : Number(execution.notes_beat_mae).toFixed(2);
     diagnostic.textContent = `密度诊断 · 音乐计划 ${execution.music_notes} 音 / 实际导出 ${execution.export_notes} 音 · 排键减键 ${execution.prepare_removed_notes + execution.layout_removed_notes} 音 · 导出减键 ${execution.export_removed_notes} 音 · 完整拍密度误差 ${mae} 音/拍 · 预算调整 ${budget.changed_beats || 0} 拍`;
+    const placement = manifest.difficulty_placement;
+    if (placement && placement.top_strain_peak_share != null) {
+      const percent = value => `${Math.round(Number(value) * 100)}%`;
+      const ratio = placement.lower_to_peak_exported_density_median;
+      diagnostic.textContent += ` · 最难 ${placement.top_sections} 段 strain 有 ${percent(placement.top_strain_peak_share)} 落在峰值段（峰值段占 ${percent(placement.peak_bar_share)} 小节）`
+        + (ratio == null ? "" : ` · 其余段落实际密度为峰值段的 ${percent(ratio)}`)
+        + (placement.excluded_bars ? ` · 已排除 ${placement.excluded_styles.join("、")} ${placement.excluded_bars} 小节` : "");
+    }
   }
 }
 
@@ -695,6 +736,7 @@ async function generate() {
     density_model_id: state.selectedDensityId,
     arrangement_model_id: state.selectedArrangementId,
     structure_id: state.selectedStructureId,
+    star_condition_id: state.selectedStarConditionId,
     coordination_id: state.selectedCoordinationId,
     budget_id: state.selectedBudgetId,
     title: $("#titleInput").value.trim(), artist: $("#artistInput").value.trim(), model_id: model.id,
@@ -1009,7 +1051,13 @@ async function initialize() {
   });
   $("#structureSelect").addEventListener("change", (event) => {
     state.selectedStructureId = event.target.value;
+    renderStarConditionOptions();
     invalidatePreview("已更改段落与乐句规划，重新生成后生效。");
+    updateGenerateButton();
+  });
+  $("#starConditionSelect").addEventListener("change", (event) => {
+    state.selectedStarConditionId = event.target.value;
+    invalidatePreview("已更改生成器难度条件，重新生成后生效。");
     updateGenerateButton();
   });
   const star = $("#starInput");

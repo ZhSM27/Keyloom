@@ -14,8 +14,10 @@ from ..local_rhythm import OFFSETS_MS, rhythm_descriptors
 from ..role_style_plan import ROLE_STYLE_VERSION, RoleStylePolicy, active_style_plan, validate_style_selection
 from ..density_coordination import COORDINATION_OPTIONS, COORDINATION_VERSION, validate_coordination, density_execution_trace
 from ..density_runtime import infer_density, resolve_density_model
-from ..hierarchical_planner import (HIERARCHY_VERSION, validate_structure_id,
+from ..hierarchical_planner import (HIERARCHY_VERSION,
     section_phrase_structure, shape_hierarchical_density, json_hierarchy)
+from ..peak_planner import (validate_structure_id, validate_star_condition, shape_peak_anchored_density,
+    section_local_stars, window_star)
 from ..generator_density import (BUDGET_VERSION, validate_budget, generator_capabilities,
     prepare_density_budget, native_density_condition, ExecutionLedger, execution_diagnostics)
 from ..role_planner_runtime import infer_arrangement, resolve_arrangement_model
@@ -123,6 +125,7 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
     arrangement_model = resolve_arrangement_model(arrangement_model_id)
     coordination_id = validate_coordination(settings.get('coordination_id','legacy'))
     structure_id = validate_structure_id(settings.get('structure_id', 'legacy'))
+    star_condition_id = validate_star_condition(settings.get('star_condition_id', 'global'), structure_id)
     budget_id = validate_budget(settings.get('budget_id', 'legacy'), for_studio=True,
                                 generator_id=generator_model.model_id,
                                 main_style=settings.get('main_style'))
@@ -226,18 +229,27 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
         plan['target_note_budget'],plan['target_row_budget'] = target_notes,target_rows
     unshaped_beat_density = beat_density.copy()
     hierarchy_report = None
-    if structure_id == 'hierarchical':
+    local_stars = None
+    if structure_id in ('hierarchical', 'peak-anchored'):
         hierarchy = section_phrase_structure(plan['quiet'], music=raw_music, acoustic=raw_acoustic, rhythm=raw_rhythm)
-        beat_density, density_shape = shape_hierarchical_density(beat_density, hierarchy)
+        if structure_id == 'peak-anchored':
+            # Keep the most intense sections at the Planner density; cap the
+            # rest at the human peak-relative ratio for this target star.
+            beat_density, density_shape = shape_peak_anchored_density(beat_density, hierarchy, target_star)
+        else:
+            beat_density, density_shape = shape_hierarchical_density(beat_density, hierarchy)
         target_notes, target_rows = beat_density.mean(1).T
         plan = active_style_plan(pattern_probability, base_density[:, 0], base_density[:, 1], thresholds, compiler_config,
             primary_label, secondary_labels, policy=RoleStylePolicy(energy_density_weight=2. if coordination_id == 'coordinated' else 0.),
             music=raw_music, acoustic=raw_acoustic, rhythm=raw_rhythm, owner_scores=owner_scores, style_evidence=style_evidence,
             density_reference=beat_density.mean(1), structure_override=hierarchy)
         plan['target_note_budget'], plan['target_row_budget'] = target_notes, target_rows
-        hierarchy_report = {'version': HIERARCHY_VERSION, 'structure': json_hierarchy(plan['hierarchy']),
-            'density': density_shape, 'adapter_context': 'frozen_legacy_segments',
+        hierarchy_report = {'version': HIERARCHY_VERSION, 'density_version': density_shape['version'],
+            'structure': json_hierarchy(plan['hierarchy']), 'density': density_shape, 'adapter_context': 'frozen_legacy_segments',
             'role_network_context': 'frozen_legacy_segments', 'new_training': False}
+        if star_condition_id == 'section':
+            local_stars, hierarchy_report['local_star'] = section_local_stars(density_shape, len(bar_starts), target_star)
+            hierarchy_report['local_star']['windows'] = []
         (job_output / 'hierarchy.json').write_text(json.dumps(hierarchy_report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     validate_plan(plan, beat_density, len(bar_starts))
     model = _generated_plan_model(generator_model.checkpoint, device=device)
@@ -268,6 +280,7 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
                         style_evidence=pattern_probability if style_evidence is None else style_evidence)
     arrangement = {"schema_version": ROLE_STYLE_VERSION, "role_source": plan["role_source"],
                    "structure_id": structure_id, "hierarchy_version": HIERARCHY_VERSION if hierarchy_report else None,
+                   "density_shaping_version": hierarchy_report['density_version'] if hierarchy_report else None,
                    "sections": plan.get('sections', []),
                    "planner_checkpoint": "planner/arrangement-r1.pt", "planner_sha256": hash_file(PLANNER_CHECKPOINT),
                    "compiler_config": compiler_config, "style_policy": plan["style_policy"],
@@ -399,6 +412,12 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
         if prefix_slots >= len(times):
             raise ValueError("Continuation window has no new positions to generate.")
         beats = absolute_beats(clock, times)
+        if local_stars is not None:
+            # Only the slots this window newly decides choose its star condition.
+            window_condition = condition.copy()
+            window_condition[0, 0] = window_star(local_stars, beats[prefix_slots:]) / 10
+            batch["condition"] = torch.from_numpy(window_condition).to(device)
+            hierarchy_report['local_star']['windows'].append({'start_beat': int(start_beat), 'star': round(float(window_condition[0, 0] * 10), 4)})
         with torch.inference_mode():
             generated = model.generate(
                 **batch,
@@ -498,6 +517,17 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
     execution_trace = execution_diagnostics(beat_density, generator_density, effective_density, bar_plan,
         section.beat_length_ms, execution_ledger, [(note.time_ms, note.column) for note in verify_notes], density_budget)
     execution_trace['count_density_reference'] = {'policy': count_density_policy, 'windows': count_density_windows}
+    from ..difficulty_placement import difficulty_placement, mania_strains
+    try:
+        # Legacy runs get the same audio sections only for this observation.
+        placement_structure = plan['hierarchy'] if hierarchy_report else section_phrase_structure(
+            plan['quiet'], music=raw_music, acoustic=raw_acoustic, rhythm=raw_rhythm)
+        strain_peaks, strain_section_ms = mania_strains(osu_path)
+        placement = difficulty_placement(strain_peaks, strain_section_ms, [note.time_ms for note in verify_notes], bar_starts,
+            placement_structure, unshaped_beat_density[..., 0].mean(1), beat_density[..., 0].mean(1),
+            bar_styles=[bar['style'] for bar in bar_plan])
+    except Exception as error:  # Observational only; never fail an already exported chart.
+        placement = {'error': f'{type(error).__name__}: {error}'}
     model_identity = {"generator": f"generator/{generator_model.model_id}",
                       "planner": "planner/arrangement/structured-v2",
                       "arrangement": f"planner/role/{arrangement_model_id}",
@@ -511,22 +541,31 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
         'onset_policy':'preserve_original_model_decisions', 'budget_id': budget_id,
         'budget_version': BUDGET_VERSION, 'execution_diagnostic_version': execution_trace['version']}
     export_provenance['effective_inference_policy'] = effective_inference_policy
-    export_provenance.update(structure_id=structure_id, hierarchy_version=HIERARCHY_VERSION if hierarchy_report else None)
+    export_provenance.update(structure_id=structure_id, hierarchy_version=HIERARCHY_VERSION if hierarchy_report else None,
+                             density_shaping_version=hierarchy_report['density_version'] if hierarchy_report else None,
+                             star_condition_id=star_condition_id,
+                             local_star_version=hierarchy_report['local_star']['version'] if local_stars is not None else None,
+                             difficulty_placement_version=placement.get('version'))
     (job_output/'density-execution.json').write_text(json.dumps(execution_trace,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (job_output/'bar-density.json').write_text(json.dumps(density_trace,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (job_output/'actual-bars.json').write_text(json.dumps(bar_plan,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    (job_output/'difficulty-placement.json').write_text(json.dumps(placement,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    if hierarchy_report:
+        # Rewritten with the per-window star conditions recorded during generation.
+        (job_output/'hierarchy.json').write_text(json.dumps(hierarchy_report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     with zipfile.ZipFile(package_path, "w") as archive:
         archive.write(osu_path, arcname=osu_path.name, compress_type=zipfile.ZIP_DEFLATED, compresslevel=6)
         archive.write(audio_path, arcname=audio_name, compress_type=zipfile.ZIP_STORED)
         archive.writestr('export-provenance.json',json.dumps(export_provenance,ensure_ascii=False),compress_type=zipfile.ZIP_DEFLATED)
         archive.writestr('bar-density.json',json.dumps(density_trace,ensure_ascii=False),compress_type=zipfile.ZIP_DEFLATED)
         archive.writestr('density-execution.json',json.dumps(execution_trace,ensure_ascii=False),compress_type=zipfile.ZIP_DEFLATED)
+        archive.writestr('difficulty-placement.json',json.dumps(placement,ensure_ascii=False),compress_type=zipfile.ZIP_DEFLATED)
         if hierarchy_report:
             archive.writestr('hierarchy.json', json.dumps(hierarchy_report, ensure_ascii=False), compress_type=zipfile.ZIP_DEFLATED)
     with zipfile.ZipFile(package_path) as archive:
         invalid_entry = archive.testzip()
         entries = archive.namelist()
-        expected_entries = {osu_path.name, audio_name,'export-provenance.json','bar-density.json','density-execution.json'}
+        expected_entries = {osu_path.name, audio_name,'export-provenance.json','bar-density.json','density-execution.json','difficulty-placement.json'}
         if hierarchy_report:
             expected_entries.add('hierarchy.json')
         if invalid_entry or set(entries) != expected_entries:
@@ -550,6 +589,11 @@ def _generate_song(audio_path: Path, settings: dict, progress, *, device="cuda")
         "style_plan_role_source": plan["role_source"],
         "arrangement_model_id": arrangement_model_id,
         "structure_id": structure_id, "hierarchy_version": HIERARCHY_VERSION if hierarchy_report else None,
+        "density_shaping_version": hierarchy_report['density_version'] if hierarchy_report else None,
+        "star_condition_id": star_condition_id,
+        "local_star": {key: value for key, value in hierarchy_report['local_star'].items() if key != 'windows'}
+                      if hierarchy_report and 'local_star' in hierarchy_report else None,
+        "difficulty_placement": {key: value for key, value in placement.items() if key not in ('sections', 'top_strains')},
         "hierarchy_sections": len(plan.get('sections', [])),
         "hierarchy_phrases": len(plan['segments']) if hierarchy_report else 0,
         "hierarchy_density": {key: value for key, value in hierarchy_report['density'].items()

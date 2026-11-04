@@ -117,6 +117,10 @@ def planner_loss(output, batch, weights):
     adjacent_density, adjacent_pattern = structure_adjacent_loss(output, batch, mask)
     repeat_density, repeat_pattern = repeated_section_loss(output, batch, mask)
     quiet_density, quiet_rows = quiet_energy_loss(output, batch, mask, density_target, rows_target)
+    # Opt-in contrast terms; absent weights leave the original objective unchanged.
+    zero = output["density_log"].sum() * 0
+    quantile = density_quantile_loss(output, batch, mask) if weights.get("density_quantile", 0.0) else zero
+    contrast_gap, contrast_rank = section_contrast_loss(output, batch, mask) if weights.get("section_contrast", 0.0) else (zero, zero)
     total = (
         density
         + rows
@@ -127,6 +131,10 @@ def planner_loss(output, batch, weights):
         + weights.get("structure_repeat", 0.0) * (repeat_density + repeat_pattern)
         + weights.get("quiet_energy", 0.0) * (quiet_density + quiet_rows)
     )
+    if weights.get("density_quantile", 0.0):
+        total = total + weights["density_quantile"] * quantile
+    if weights.get("section_contrast", 0.0):
+        total = total + weights["section_contrast"] * (contrast_gap + contrast_rank)
     return {
         "loss": total,
         "density_loss": density,
@@ -140,7 +148,69 @@ def planner_loss(output, batch, weights):
         "structure_repeat_pattern_loss": repeat_pattern,
         "quiet_density_loss": quiet_density,
         "quiet_rows_loss": quiet_rows,
+        "density_quantile_loss": quantile,
+        "section_contrast_gap_loss": contrast_gap,
+        "section_contrast_rank_loss": contrast_rank,
     }
+
+
+def density_quantile_loss(output, batch, mask, quantiles=(0.1, 0.5, 0.9), minimum_bars=8, beta=0.05):
+    """Match each chart's low, median and high bar density, not only per-bar means.
+
+    Per-bar regression under one song-wide star condition flattens a chart
+    toward its median; matching the within-chart quantiles keeps the peak
+    level and the spread between quiet and intense passages. Log gaps are
+    0.1-0.3, so a near-L1 ``beta`` keeps gradients from vanishing.
+    """
+    predicted = output["density_log"][..., 0]
+    target = torch.log1p(batch["notes_per_beat"])
+    levels = torch.tensor(quantiles, dtype=predicted.dtype, device=predicted.device)
+    losses = []
+    for ordinal in range(len(predicted)):
+        selected = mask[ordinal]
+        if selected.sum() < minimum_bars:
+            continue
+        losses.append(nn.functional.smooth_l1_loss(torch.quantile(predicted[ordinal][selected], levels),
+                                                   torch.quantile(target[ordinal][selected].to(predicted.dtype), levels), beta=beta))
+    return torch.stack(losses).mean() if losses else predicted.sum() * 0
+
+
+def section_contrast_loss(output, batch, mask, margin=0.15, beta=0.05):
+    """Section-mean density gaps and order over audio-derived sections.
+
+    Mirrors the section gap/rank terms of the density adapter so the base
+    Planner itself learns that verses and choruses differ. ``section_ids``
+    (bars, -1 where none) must come from audio structure, as the adapter's
+    ``segment_ids`` did; ``is_section_start`` marks timing sections only and is
+    a single bar for constant-tempo songs, so it is deliberately not used.
+    """
+    predicted = output["density_log"][..., 0]
+    zero = predicted.sum() * 0
+    section_ids = batch.get("section_ids")
+    if section_ids is None:
+        return zero, zero
+    target = torch.log1p(batch["notes_per_beat"]).to(predicted.dtype)
+    gaps, ranks = [], []
+    for ordinal in range(len(predicted)):
+        selected = mask[ordinal] & (section_ids[ordinal] >= 0)
+        ids, positions = torch.unique(section_ids[ordinal][selected], return_inverse=True)
+        if len(ids) < 2:
+            continue
+        membership = nn.functional.one_hot(positions, len(ids)).to(predicted.dtype)
+        sizes = membership.sum(0)
+        p = (membership * predicted[ordinal][selected, None]).sum(0) / sizes
+        t = (membership * target[ordinal][selected, None]).sum(0) / sizes
+        upper = torch.triu(torch.ones(len(ids), len(ids), dtype=torch.bool, device=p.device), diagonal=1)
+        difference_p, difference_t = (p[:, None] - p[None])[upper], (t[:, None] - t[None])[upper]
+        gaps.append(nn.functional.smooth_l1_loss(difference_p, difference_t, beta=beta))
+        strong = difference_t.abs() > margin
+        if strong.any():
+            ranks.append(torch.relu(margin - difference_t.sign() * difference_p)[strong].mean())
+
+    def average(values):
+        return torch.stack(values).mean() if values else zero
+
+    return average(gaps), average(ranks)
 
 
 def _time_features(batch, mask):

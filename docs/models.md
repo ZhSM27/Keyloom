@@ -11,13 +11,14 @@ Public identities use a descriptive family ID and a family-scoped revision. `mus
 | Role planner | rule | r1 | rule-based baseline |
 | Role planner | standard / balanced | r1 | latest conditional role models |
 | Density planner | fixed / contrast | r1 | base density / section contrast adapter |
-| Structure | legacy / hierarchical | r1 | baseline / latest section–phrase hierarchy |
+| Structure | legacy / hierarchical / peak-anchored | r1 / v2 | baseline / section–phrase hierarchy / peak-anchored section density |
+| Generator star condition | global / section | v1 | song-wide star / section-local star (requires peak-anchored) |
 
 The catalog is the authority for file names, revisions, architecture IDs, sizes and digests. A density adapter must also match the base planner digest. Released assets contain inference configuration, normalization and weights, without optimizer state, RNG snapshots, chart lists or machine paths. The source distribution does not include the training corpus or full training pipeline; it supports inference reproduction, not independent reproduction of training.
 
 ## Research status
 
-All four generators remain research models. Teacher-prefix and rollout-prefix variants have not demonstrated sufficient musical improvement to replace the retained baseline. Better count loss alone does not establish fewer reductions or more natural patterns. The hierarchical planner is opt-in: it adds section/phrase structure, but its impact depends on the selected generator, arrangement and density controls.
+All four generators remain research models. Teacher-prefix and rollout-prefix variants have not demonstrated sufficient musical improvement to replace the retained baseline. Better count loss alone does not establish fewer reductions or more natural patterns. The hierarchical planner is opt-in: it adds section/phrase structure, but its impact depends on the selected generator, arrangement and density controls. `peak-anchored` uses the same hierarchy but replaces its total-preserving ±12% shaping with peak-anchored allocation; see [peak allocation](peak-allocation.md). The project owner's listening and playtesting of Jumpstream charts was positive; other styles have measurements only.
 
 `count-reference` density execution currently supports only `music-base` with Jumpstream. It is not a general solution to planned-versus-exported count mismatch. The unavailable feasibility adapter is not presented as a trained model. Execution reports preserve planned counts, decoded counts and export reductions/drops separately.
 

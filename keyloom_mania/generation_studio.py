@@ -21,7 +21,9 @@ from .catalog import CATALOG_PATH
 from .role_style_plan import ROLE_STYLE_VERSION, active_style_plan, validate_style_selection
 from .density_coordination import COORDINATION_OPTIONS, COORDINATION_VERSION, validate_coordination
 from .density_runtime import density_options, resolve_density_model
-from .hierarchical_planner import STRUCTURE_OPTIONS, HIERARCHY_VERSION, validate_structure_id
+from .hierarchical_planner import HIERARCHY_VERSION
+from .peak_planner import (STRUCTURE_OPTIONS, STAR_CONDITION_OPTIONS, PEAK_VERSION, LOCAL_STAR_VERSION,
+    validate_structure_id, validate_star_condition)
 from .generator_density import BUDGET_OPTIONS, BUDGET_VERSION, DIAGNOSTIC_VERSION, validate_budget
 from .role_planner_runtime import arrangement_options, resolve_arrangement_model
 from .segment_labels import LABELS
@@ -146,6 +148,7 @@ class StudioApp:
             resolve_arrangement_model(arrangement_model_id)
             coordination_id=validate_coordination(settings.get('coordination_id','legacy'))
             structure_id=validate_structure_id(settings.get('structure_id','legacy'))
+            star_condition_id=validate_star_condition(settings.get('star_condition_id','global'), structure_id)
             budget_id=validate_budget(settings.get('budget_id','legacy'), for_studio=True, generator_id=generator_model.model_id)
             settings = {
                 "bpm": float(settings.get("bpm", job.get("detected_bpm") or 120)),
@@ -157,6 +160,7 @@ class StudioApp:
                 "arrangement_model_id": arrangement_model_id,
                 "coordination_id":coordination_id,
                 "structure_id":structure_id,
+                "star_condition_id":star_condition_id,
                 "budget_id":budget_id,
                 "title": str(settings.get("title", job.get("title", Path(job["filename"]).stem))),
                 "artist": str(settings.get("artist", job.get("artist", "Unknown artist"))),
@@ -263,7 +267,8 @@ class StudioApp:
             "default_arrangement_model_id": "rule",
             "coordination_options":list(COORDINATION_OPTIONS),"default_coordination_id":"legacy",
             "coordination_version":COORDINATION_VERSION,
-            "structure_options":list(STRUCTURE_OPTIONS), "default_structure_id":"legacy", "hierarchy_version":HIERARCHY_VERSION,
+            "structure_options":list(STRUCTURE_OPTIONS), "default_structure_id":"legacy", "hierarchy_version":HIERARCHY_VERSION, "peak_allocation_version":PEAK_VERSION,
+            "star_condition_options":list(STAR_CONDITION_OPTIONS), "default_star_condition_id":"global", "local_star_version":LOCAL_STAR_VERSION,
             "budget_options":list(BUDGET_OPTIONS), "default_budget_id":"legacy",
             "budget_version":BUDGET_VERSION, "execution_diagnostic_version":DIAGNOSTIC_VERSION,
             "planner_integration_version":"planner-suite-r1",
